@@ -1,0 +1,46 @@
+﻿  stdafx.cpp
+  SPMwithGPUShaders.cpp
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\angel.h(83): warning C4305: 'initializing': truncation from 'double' to 'GLfloat'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(707): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(708): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(709): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(730): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(732): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(735): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(753): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(306): warning C4305: 'argument': truncation from 'double' to 'GLfloat'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(307): warning C4305: 'argument': truncation from 'double' to 'GLfloat'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(308): warning C4305: 'argument': truncation from 'double' to 'GLfloat'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(309): warning C4305: 'argument': truncation from 'double' to 'GLfloat'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(310): warning C4305: 'argument': truncation from 'double' to 'GLfloat'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(392): warning C4305: '-=': truncation from 'double' to 'float'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(396): warning C4305: '+=': truncation from 'double' to 'float'
+  MapData.cpp
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\angel.h(83): warning C4305: 'initializing': truncation from 'double' to 'GLfloat'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(707): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(708): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(709): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(730): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(732): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(735): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(753): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\mapdata.cpp(46): warning C4101: 'height': unreferenced local variable
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\mapdata.cpp(46): warning C4101: 'width': unreferenced local variable
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\mapdata.cpp(122): warning C4018: '<': signed/unsigned mismatch
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\mapdata.cpp(136): warning C4018: '<': signed/unsigned mismatch
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\mapdata.cpp(153): warning C4018: '<': signed/unsigned mismatch
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\mapdata.cpp(176): warning C4018: '<': signed/unsigned mismatch
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\mapdata.cpp(183): warning C4018: '<': signed/unsigned mismatch
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\mapdata.cpp(202): warning C4018: '<': signed/unsigned mismatch
+  InitializeShader.cpp
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\angel.h(83): warning C4305: 'initializing': truncation from 'double' to 'GLfloat'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(707): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(708): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(709): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(730): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(732): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(735): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(753): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+  Generating Code...
+  SPMwithGPUShaders.vcxproj -> C:\PROJECT\ASE final project\SPMwithGPUShaders\Debug\SPMwithGPUShaders.exe
+  SPMwithGPUShaders.vcxproj -> C:\PROJECT\ASE final project\SPMwithGPUShaders\Debug\SPMwithGPUShaders.pdb (Full PDB)
