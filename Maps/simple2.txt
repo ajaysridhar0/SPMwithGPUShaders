@@ -1,7 +1,7 @@
 polygons: 4
 
 domain
-1 1;
+1;
 
 sources 0
 1. 1. 0. 0.;

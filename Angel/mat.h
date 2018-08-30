@@ -718,7 +718,7 @@ inline
 mat4 Ortho2D( const GLfloat left, const GLfloat right,
 	      const GLfloat bottom, const GLfloat top )
 {
-    return Ortho( left, right, bottom, top, -1.0, 1.0 );
+    return Ortho( left, right, bottom, top, -10.0, 10.0 );
 }
 
 inline

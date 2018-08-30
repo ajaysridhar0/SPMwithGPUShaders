@@ -28,27 +28,25 @@ vec2 domainData[4] =
 	vec2(1,1),
 	vec2(1,-1)
 };
+GLuint mapDrawingOrder[4] = { 0, 1, 2, 3 };
 
-int PIXEL_AREA = 1024*1024;
-float windowRatio = (mapReader->getInitDomain().x) / (mapReader->getInitDomain().y);
-unsigned int WINDOW_HEIGHT = int(sqrt(PIXEL_AREA /windowRatio));
-unsigned int WINDOW_WIDTH = int(PIXEL_AREA /WINDOW_HEIGHT);
+unsigned int windowHeight = 1024;
+unsigned int windowWidth = windowHeight;
 // for reading the stencil value in a shader
 unsigned int * stencilData; 
 
-GLuint shaderProgram;
+GLuint defaultShaderProgram, drawSPMShaderProgram;
 GLuint shadowAreaShaderProgram, coneShaderProgram;
 GLuint searchComputeShader, distanceComputeShader;
-GLuint dataArraySSbo;
+GLuint dataArraySSbo, stencilValuesSSbo;
 
 // declaration of uniform variables
-GLuint projectionUniform[3],
-modelViewUniform[3],
+GLuint projectionUniform[4],
+modelViewUniform[4],
 colorUniform,
 csvfUniform,
-prevRenderUniform, 
-stencilValuesUniform,
-windowSizeUniform;
+prevRenderUniform[2], 
+windowSizeUniform[2];
 
 bool computeOnce = true;
 
@@ -57,15 +55,15 @@ mat4 projection = Ortho2D(-1., 1., -1., 1.);
 mat4 modelView = Angel::Scale(1, 1, 1);
 
 // declaration of Attribute variables
-GLuint positionAttribute,
+GLuint
 colorAttribute,
-vertexAttribute[2];
+vertexAttribute[4];
 //frame buffer
-GLuint frameBufferObject[2];
+GLuint framebufferObject[2];
 //prev render
 GLuint prevRender[2];
-// two VAO for each shader process
-GLuint vertexArrayObject[3];
+// 2 VAO for each shader process
+GLuint vertexArrayObject[2];
 // compute shaders stuff
 int fullShadowCounter = 0;
 int miniFullShadowCounter = 0;
@@ -80,6 +78,7 @@ void generateMap(); // done
 void generateShadowAreas(); // needs to be tested
 void generateCones(); // work in progress
 void distanceCompute(); // needs to be integrated
+void drawSPM();
 void runSPM();
 // GLUT stuff
 void display();
@@ -93,17 +92,18 @@ void loadSearchComputeShader();
 // SPM shaders
 void loadShadowAreaShader();
 void loadConeShader();
+void loadDrawSPMShader();
 
 void InitSPMSystem();
 // buffer data
-void loadDefaultBufferData();
-void loadBufferData(const Vertex * vertices);
+void loadBufferData();
+void enableUserFramebuffer();
 
 int pixelIndex(vec2 mapCoord)
 {
-	int x = int(((WINDOW_WIDTH -1)/ 2) * (mapCoord.x + 1));
-	int y =	int(((WINDOW_HEIGHT -1) / 2) * (mapCoord.y + 1));
-	return y * WINDOW_WIDTH + x;
+	int x = (int)(((windowWidth -1)/ 2) * (mapCoord.x + 1));
+	int y =	(int)(((windowHeight -1) / 2) * (mapCoord.y + 1));
+	return y * windowWidth + x;
 }
 
 void printStencilAdj(vec2 mapCoord)
@@ -114,8 +114,8 @@ void printStencilAdj(vec2 mapCoord)
 	{
 		for (int j = 0; j <= 4; j ++)
 		{
-			cout << stencilData[pixelIndex(mapCoord) + (2-i)*WINDOW_WIDTH + j-2];
-			if (stencilData[pixelIndex(mapCoord) + (2 - i)*WINDOW_WIDTH + j - 2] == 1)
+			cout << stencilData[pixelIndex(mapCoord) + (2-i)*windowWidth + j-2];
+			if (stencilData[pixelIndex(mapCoord) + (2 - i)*windowWidth + j - 2] == 1)
 			{
 				shadowCounter++;
 				if (i >= 1 && i <= 3 && j >= 1 && j <=3)
@@ -141,26 +141,19 @@ void globalState()
 {
 	// configure global opengl state
 	// -----------------------------
-	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(GL_LESS);
-	glEnable(GL_STENCIL_TEST);
-	glStencilFunc(GL_ALWAYS, 0, 0xFF);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-	// disable blue component
-	// glColorMask(GL_TRUE, GL_TRUE, GL_FALSE, GL_TRUE);
-	glDepthMask(GL_TRUE);
-	// dont draw the polygons in the stencil buffer
-	glStencilMask(0x00);
-	//-------------------------------
+	glClearColor(0., 0., 0., 0.);
+	glClear(GL_COLOR_BUFFER_BIT);
 }
 
 void generateMap()
 {
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, windowWidth, windowHeight);
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glDepthMask(GL_TRUE);
 	glStencilMask(0x00);
 	glDisable(GL_STENCIL_TEST);
-	glUseProgram(shaderProgram);
+	glUseProgram(defaultShaderProgram);
 	glBindVertexArray(vertexArrayObject[0]);
 	// projection transformations with projection matrix
 	glUniformMatrix4fv(projectionUniform[0], 1, GL_TRUE, projection);
@@ -169,39 +162,26 @@ void generateMap()
 	for (int i = 0; i < mapReader->getNumOfPolygons(); i++)
 	{
 		// warning: works only for concave polygons
-		//glDrawElements(GL_TRIANGLE_FAN, mapReader->getVertexData()[i + 1].size(), GL_UNSIGNED_INT, mapReader->getIndices()[i]);
+		glDrawElements(GL_TRIANGLE_FAN, mapReader->getVertexData()[i + 1].size(), GL_UNSIGNED_INT, mapReader->getIndices()[i]);
 	
 	}
 	glBindVertexArray(0);
 	glUseProgram(0);
 }
 
+void searchCompute()
+{
+	glUseProgram(searchComputeShader);
+	glDispatchCompute(1, 1, 1);
+	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+	glUseProgram(0);
+}
 
 //stencil value = 1 in the shadow area
 void generateShadowAreas()
 {
-	//from stack overflow--------------------------------------------------
-	//// no fragments drawn
-	//glStencilFunc(GL_NEVER, 1, 0xFF);
-	//// disable writing to the depth buffer and the color buffer
-	//glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-	//glDepthMask(GL_FALSE);
-	//// enable writting to the stencil buffer
-	//glStencilMask(0xFF);
-	//glStencilOp(GL_REPLACE, GL_KEEP, GL_KEEP);
-	//---------------------------------------------------------------------
-	
-	//from 1st paper-------------------------------------------------------
-	/*glClear(GL_STENCIL_BUFFER_BIT);
-	glDrawBuffer(GL_NONE);
-	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-	glDisable(GL_CULL_FACE);
-	glStencilFunc(GL_ALWAYS, 0, 0xFF);
-	glStencilOpSeparate(GL_BACK, GL_KEEP, GL_INCR_WRAP, GL_KEEP);
-	glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_DECR_WRAP, GL_KEEP);
-	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);*/
-	//----------------------------------------------------------------------
-
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, windowWidth, windowHeight);
 	//From OpenGL Wiki----------------------------------------------------------------
 	/* onDisplay */
 	glClear(GL_DEPTH_BUFFER_BIT);
@@ -217,7 +197,7 @@ void generateShadowAreas()
 	
 	// draw the Shadow Areas to the stencil buffer
 	glUseProgram(shadowAreaShaderProgram);
-	glBindVertexArray(vertexArrayObject[1]);
+	glBindVertexArray(vertexArrayObject[0]);
 	glUniformMatrix4fv(projectionUniform[1], 1, GL_TRUE, projection);
 	glUniformMatrix4fv(modelViewUniform[1], 1, GL_TRUE, modelView);
 	glUniform1f(csvfUniform, GLfloat(csvf+1.));
@@ -227,82 +207,25 @@ void generateShadowAreas()
 	}
 	glBindVertexArray(0);
 	glUseProgram(0);
-	/*glEnable(GL_CULL_FACE);
-	glDrawBuffer(GL_BACK);*/
-}
-
-void generateCones()
-{
-	// from 1st paper ---------------------------------------
-	/*glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	glDepthMask(GL_TRUE);
-	glStencilOpSeparate(GL_BACK, GL_KEEP, GL_KEEP, GL_KEEP);
-	glStencilFunc(GL_EQUAL, 0, 0xFF);
-	glBindVertexArray(0);
-	glUseProgram(0);*/
-	//--------------------------------------------------------
-
-	//from wiki-------------------------------------------------
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	glDepthMask(GL_TRUE);
-	glStencilMask(0x00);
-	// draw where stencil's value is 0
-	glStencilFunc(GL_EQUAL, 0, 0xFF);
-	//-----------------------------------------------------------
-
-	//glGenFramebuffers(1, &frameBufferObject[0]);
-	//glBindFramebuffer(GL_FRAMEBUFFER, frameBufferObject[0]);
-
-	//if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
-	//	cout << "Framebuffer succesfully binded" << endl;
-	//else
-	//{
-	//	cerr << "ERROR::FRAMEBUFFER:: Framebuffer did not bind" << endl;
-	//	return;
-	//}
-
-	//glGenTextures(1, &prevRender[0]);
-	//glBindTexture(GL_TEXTURE_2D, prevRender[0]);
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	//glBindTexture(GL_TEXTURE_2D, 0);
-
-	//// attach the texture to the framebuffer
-	//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, prevRender[0], 0);
-	//
-	//glUseProgram(coneShaderProgram);
-	//glBindVertexArray(vertexArrayObject[1]);
-	//glUniformMatrix4fv(projectionUniform[1], 1, GL_TRUE, projection);
-	//glUniformMatrix4fv(modelViewUniform[1], 1, GL_TRUE, modelView);
-	//glUniform1i(prevRenderUniform, (GLuint)prevRender);
-	////draw rect that covers whole map
-	//GLubyte mapDrawingOrder[4] = { 0, 1, 2, 3 };
-	//glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_INT, mapDrawingOrder);
-
-	glUseProgram(shaderProgram);
-	glBindVertexArray(vertexArrayObject[2]);
-	// projection transformations with projection matrix
-	glUniformMatrix4fv(projectionUniform[0], 1, GL_TRUE, projection);
-	glUniformMatrix4fv(modelViewUniform[0], 1, GL_TRUE, modelView);
-	glUniform3fv(colorUniform, 1, vec3(0.,  .5, .0));
-	GLuint mapDrawingOrder[4] = { 0, 1, 2, 3 };
-	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_INT, mapDrawingOrder);
-	glBindVertexArray(0);
-	glUseProgram(0);
 
 	//reads and stores the stencil values--------------------------------------------------------------------
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-	stencilData = new unsigned int[WINDOW_WIDTH * WINDOW_HEIGHT];
-	glReadPixels(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, GL_STENCIL_INDEX, GL_UNSIGNED_INT, stencilData);
+	stencilData = new unsigned int[windowWidth * windowHeight];
+	glReadPixels(0, 0, windowWidth, windowHeight, GL_STENCIL_INDEX, GL_UNSIGNED_INT, stencilData);
+	// makes a ssbo for stencil values to read in Distance Compute Shader
+	stencilValuesSSbo = init->AllocateBuffer(GL_SHADER_STORAGE_BUFFER, (unsigned int*)stencilData, windowHeight*windowWidth * sizeof(unsigned int));
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, stencilValuesSSbo);
+	// print stencil values near vertices
 	if (true)
 	{
-		cout << "Pixel count:  " << WINDOW_WIDTH * WINDOW_HEIGHT << endl;
+		cout << "Pixel count:  " << windowWidth * windowHeight << endl;
 		printStencilAdj(vec2(-.75, .75));
 		printStencilAdj(vec2(-.75, .25));
 		printStencilAdj(vec2(-.25, .25));
-		
+		//in shadow:-------------------------
+		//printStencilAdj(vec2(-.25, .75));
+		//-----------------------------------
 		printStencilAdj(vec2(-.6, -.2));
 		printStencilAdj(vec2(-.6, -.6));
 		printStencilAdj(vec2(-.1, -.6));
@@ -310,66 +233,126 @@ void generateCones()
 		printStencilAdj(vec2(.9, -.4));
 		cout << "# of FULL 5x5 shadows: " << fullShadowCounter << endl;
 		cout << "# of FULL 3x3 shadows: " << miniFullShadowCounter << endl;
-		for(int i = 0; i < 35; i++)
+		for (int i = 0; i < 25; i++)
 		{
 			cout << endl;
 		}
-		computeOnce = false;
 	}
 	//-------------------------------------------------------------------------------------------------------
-	glDisable(GL_STENCIL_TEST);
 }
 
-void searchCompute()
+
+
+void generateCones()
 {
-	glUseProgram(searchComputeShader);
-	glDispatchCompute(1, 1, 1);
-	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	//glViewport(0, 0, windowWidth, windowHeight);
+	////from wiki-------------------------------------------------
+	glEnable(GL_STENCIL_TEST);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glDepthMask(GL_TRUE);
+	glStencilMask(0x00);
+	// draw where stencil's value is 0
+	glStencilFunc(GL_EQUAL, 0, 0xFF);
+	//-----------------------------------------------------------
+	//coneshader---------------------------------------------------------------
+	glUseProgram(coneShaderProgram);
+	glBindVertexArray(vertexArrayObject[1]);
+	const GLuint WINDOW_WIDTH = windowWidth;
+	//glUniform1ui(windowSizeUniform[1],  WINDOW_WIDTH);
+	glUniformMatrix4fv(projectionUniform[2], 1, GL_TRUE, projection);
+	glUniformMatrix4fv(modelViewUniform[2], 1, GL_TRUE, modelView);
+	glUniform1i(prevRenderUniform[0], (GLuint)prevRender[0]);
+	//draw rect that covers whole map
+	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_INT, mapDrawingOrder);
+	glDisable(GL_STENCIL_TEST);
 	glUseProgram(0);
+	
+	//--------------------------------------------------------------------------
+	//ivec2 screenpos = ivec2(gl_FragCoord.xy); // convert fragment position to integers
+	//vec4 currentValue = texelFetch(prevRender, screenpos, 0); // what is currently stored in this pixel
+	//fFragColor = currentValue;
+	//if (!inShadow(screenpos))
+	//{
+	//	vec2 p = normalize(gl_FragCoord.xy);
+	//	vec2 pg = normalize(vec2(gCurr.x, gCurr.y));
+	//
+	//	// calculate distance to gCurr and add to gCurr's distance
+	//	// this gives us the length of a canidate for shortest path
+	//	float newDist = distance(p, pg) + gCurr.distance;
+	//
+	//	if (currentValue.z == -1 || newDist < currentValue.z * distFactor)
+	//	{
+	//		fFragColor = vec4(gCurr.x, gCurr.y, newDist / distFactor, 1);
+	//		fFragColor = vec4(0., 1., 1., 1.);
+	//		// x used for red comp
+	//		// y used for green comp
+	//		// length of shortest path for blue comp
+	//		// if cone reaches pixel, alpha channel >0
+	//		// sent to framebuffer
+	//	}
+	//}
 }
 
 void distanceCompute()
 {
 	glUseProgram(distanceComputeShader);
-	/*glGenFramebuffers(1, &frameBufferObject[1]);
-	glBindFramebuffer(GL_FRAMEBUFFER, frameBufferObject[1]);
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
-		cout << "Framebuffer succesfully binded" << endl;
-	else
-	{
-		cerr << "ERROR::FRAMEBUFFER:: Framebuffer did not bind" << endl;
-		return;
-	}
-	
-	glGenTextures(1, &prevRender[1]);
-	glBindTexture(GL_TEXTURE_2D, prevRender[1]);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_STENCIL, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	// attach the texture to the framebuffer
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, prevRender[0], 0);*/
-	GLuint windowSize[2] = {WINDOW_WIDTH, WINDOW_HEIGHT};
-	glUniform1uiv(windowSizeUniform, 2, windowSize);
-	glUniform1uiv(stencilValuesUniform, WINDOW_HEIGHT * WINDOW_WIDTH, stencilData);
-	glDispatchCompute(1, 1, 1);
+	const GLuint WINDOW_WIDTH = windowWidth;
+	const GLuint WINDOW_HEIGHT = windowHeight;
+	const GLuint windowSize[2] = { WINDOW_WIDTH, WINDOW_HEIGHT };
+	glUniform1uiv(windowSizeUniform[0], 2, windowSize);
+	glDispatchCompute(mapReader->getSizeOfDataArray(), 1, 1);
 	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
 	glUseProgram(0);
+}
 
+void drawSPM()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, windowWidth, windowHeight);
+	glClearColor(0., 0., 0., 1.);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glColorMask(GL_TRUE, GL_TRUE, GL_FALSE, GL_TRUE);
+	glDepthMask(GL_TRUE);
+	glStencilMask(0x00);
+	glDisable(GL_STENCIL_TEST);
+	// return to default framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glUseProgram(drawSPMShaderProgram);
+	glBindVertexArray(vertexArrayObject[1]);
+	// projection transformations with projection matrix
+	glUniformMatrix4fv(projectionUniform[3], 1, GL_TRUE, projection);
+	glUniformMatrix4fv(modelViewUniform[3], 1, GL_TRUE, modelView);
+	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_INT, mapDrawingOrder);
+	glUniform1i(prevRenderUniform[1], (GLuint)prevRender[0]);
+	glBindVertexArray(0);
+	glUseProgram(0);
 }
 
 void runSPM()
 {	
-	searchCompute();
-	generateShadowAreas();
-	generateCones();
+	for (int i = 0; i < mapReader->getSizeOfDataArray()-1; i++)
+	{
+		searchCompute();
+		generateShadowAreas();
+		generateCones();
+		distanceCompute();
+	}
 }
 
 void display()
 {
-	runSPM();
+	globalState();
+	if (computeOnce)
+	{
+		runSPM();
+		computeOnce = false;
+	}
+	//
+	//searchCompute();
+	//generateShadowAreas();
+	drawSPM();
 	generateMap();
 	glutSwapBuffers();
 	Angel::CheckError();
@@ -377,12 +360,10 @@ void display()
 
 void reshape(int W, int H)
 {
-	WINDOW_WIDTH = W;
-	WINDOW_HEIGHT = H;
-	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+	windowWidth = W;
+	windowHeight = H;
+	glViewport(0, 0, windowWidth, windowHeight);
 }
-
-
 
 void keyboard(unsigned char key, int x, int y)
 {
@@ -403,24 +384,24 @@ void keyboard(unsigned char key, int x, int y)
 
 void loadDefaultShader()
 {
-	// most likely will change
-	shaderProgram = init->InitShader("Shaders/Default-Vert.glsl", "Shaders/Default-Frag.glsl",
-		"fFragColor");
+	defaultShaderProgram = init->InitShader("Shaders/Default-Vert.glsl", 
+											"Shaders/Default-Frag.glsl",
+											"fFragColor");
 
-	positionAttribute = glGetAttribLocation(shaderProgram, "position");
-	if (positionAttribute == GL_INVALID_INDEX) {
-		cerr << "Default shader did not contain the 'position' uniform." << endl;
+	vertexAttribute[0] = glGetAttribLocation(defaultShaderProgram, "vertex");
+	if (vertexAttribute[0] == GL_INVALID_INDEX) {
+		cerr << "Default shader did not contain the 'vertex' uniform." << endl;
 	}
 	// loading in all uniform variables to shaders
-	projectionUniform[0] = glGetUniformLocation(shaderProgram, "projection");
+	projectionUniform[0] = glGetUniformLocation(defaultShaderProgram, "projection");
 	if (projectionUniform[0] == GL_INVALID_INDEX) {
 		cerr << "Default shader did not contain the 'projection' uniform." << endl;
 	}
-	modelViewUniform[0] = glGetUniformLocation(shaderProgram, "modelView");
+	modelViewUniform[0] = glGetUniformLocation(defaultShaderProgram, "modelView");
 	if (modelViewUniform[0] == GL_INVALID_INDEX) {
 		cerr << "Default shader did not contain the 'modelView' uniform." << endl;
 	}
-	colorUniform = glGetUniformLocation(shaderProgram, "color");
+	colorUniform = glGetUniformLocation(defaultShaderProgram, "color");
 	if (colorUniform == GL_INVALID_INDEX) {
 		cerr << "Default shader did not contain the 'color' uniform." << endl;
 	}
@@ -437,12 +418,8 @@ void loadDistanceComputeShader()
 {
 	// Initialize and create the compute shader that update the siatances in the search DataArray
 	distanceComputeShader = init->InitComputeShader("Shaders/SPM-DistanceCompute.glsl");
-	stencilValuesUniform = glGetUniformLocation(distanceComputeShader, "stencilValues");
-	if (csvfUniform == GL_INVALID_INDEX) {
-		cerr << "Distance compute shader did not contain the 'stencilValues' uniform." << endl;
-	}
-	windowSizeUniform = glGetUniformLocation(distanceComputeShader, "windowSize");
-	if (windowSizeUniform == GL_INVALID_INDEX) {
+	windowSizeUniform[0] = glGetUniformLocation(distanceComputeShader, "windowSize");
+	if (windowSizeUniform[0] == GL_INVALID_INDEX) {
 		cerr << "Distance compute shader did not contain the 'windowSize' uniform." << endl;
 	}
 }
@@ -455,8 +432,8 @@ void loadShadowAreaShader()
 		"Shaders/ShadowArea-Frag.glsl",
 		"fFragColor");
 	// loading in all attribute variables to shaders
-	vertexAttribute[0] = glGetAttribLocation(shadowAreaShaderProgram, "vertex");
-	if (vertexAttribute[0] == GL_INVALID_INDEX) {
+	vertexAttribute[1] = glGetAttribLocation(shadowAreaShaderProgram, "vertex");
+	if (vertexAttribute[1] == GL_INVALID_INDEX) {
 		cerr << "Shadow area shader did not contain the 'vertex' attribute." << endl;
 	}
 	// loading in all uniform variables to shaders
@@ -478,11 +455,11 @@ void loadConeShader()
 {
 	coneShaderProgram = init->InitShader(
 		"Shaders/Cone-Vert.glsl",
-		"Shaders/Cone-Geom.glsl",
+		"Shaders/Cone-Frag.glsl",
 		"fFragColor");
 	// loading in all attribute variables to shaders
-	vertexAttribute[1] = glGetAttribLocation(coneShaderProgram, "vertex");
-	if (vertexAttribute[1] == GL_INVALID_INDEX) {
+	vertexAttribute[2] = glGetAttribLocation(coneShaderProgram, "vertex");
+	if (vertexAttribute[2] == GL_INVALID_INDEX) {
 		cerr << "Cone shader did not contain the 'vertex' attribute." << endl;
 	}
 	// loading in all uniform variables to shaders
@@ -494,9 +471,39 @@ void loadConeShader()
 	if (modelViewUniform[2] == GL_INVALID_INDEX) {
 		cerr << "Cone shader did not contain the 'modelView' uniform." << endl;
 	}
-	prevRenderUniform = glGetUniformLocation(coneShaderProgram, "prevRender");
-	if (prevRenderUniform == GL_INVALID_INDEX) {
+	prevRenderUniform[0] = glGetUniformLocation(coneShaderProgram, "prevRender");
+	if (prevRenderUniform[0] == GL_INVALID_INDEX) {
 		cerr << "Cone shader did not contain the 'prevRender' uniform." << endl;
+	}
+	windowSizeUniform[1] = glGetUniformLocation(distanceComputeShader, "windowSize");
+	if (windowSizeUniform[1] == GL_INVALID_INDEX) {
+		cerr << "Cone shader did not contain the 'windowSize' uniform." << endl;
+	}
+}
+
+void loadDrawSPMShader()
+{
+	drawSPMShaderProgram = init->InitShader(
+		"Shaders/DrawSPM-Vert.glsl",
+		"Shaders/DrawSPM-Frag.glsl",
+		"fFragColor");
+	// loading in all attribute variables to shaders
+	vertexAttribute[3] = glGetAttribLocation(drawSPMShaderProgram, "vertex");
+	if (vertexAttribute[3] == GL_INVALID_INDEX) {
+		cerr << "DrawSPM shader did not contain the 'vertex' attribute." << endl;
+	}
+	// loading in all uniform variables to shaders
+	projectionUniform[3] = glGetUniformLocation(drawSPMShaderProgram, "projection");
+	if (projectionUniform[3] == GL_INVALID_INDEX) {
+		cerr << "DrawSPM shader did not contain the 'projection' uniform." << endl;
+	}
+	modelViewUniform[3] = glGetUniformLocation(drawSPMShaderProgram, "modelView");
+	if (modelViewUniform[3] == GL_INVALID_INDEX) {
+		cerr << "DrawSPM shader did not contain the 'modelView' uniform." << endl;
+	}
+	prevRenderUniform[1] = glGetUniformLocation(drawSPMShaderProgram, "prevRender");
+	if (prevRenderUniform[1] == GL_INVALID_INDEX) {
+		cerr << "DrawSPM shader did not contain the 'prevRender' uniform." << endl;
 	}
 }
 
@@ -505,14 +512,13 @@ void InitSPMSystem()
 	Vertex* dataArray = new Vertex[mapReader->getSizeOfDataArray()];
 	Vertex* pDataArray = dataArray;
 	pDataArray = mapReader->getDataArray();
-
 	mapReader->printDataArray(pDataArray);
-	loadBufferData(pDataArray);
-	
+	dataArraySSbo = init->AllocateBuffer(GL_SHADER_STORAGE_BUFFER, (float*)pDataArray, (mapReader->getSizeOfDataArray()) * sizeof(Vertex));
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, dataArraySSbo);
 	delete[] dataArray;
 }
 
-void loadDefaultBufferData()
+void loadBufferData()
 {
 	glGenVertexArrays(1, &vertexArrayObject[0]);
 	glBindVertexArray(vertexArrayObject[0]);
@@ -520,37 +526,76 @@ void loadDefaultBufferData()
 	glGenBuffers(1, &vertexBuffer[0]);
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer[0]);
 	glBufferData(GL_ARRAY_BUFFER, mapReader->getSizeOfDataArray() * sizeof(Vertex), mapReader->getDataArray(), GL_STATIC_DRAW);
-	
-	glEnableVertexAttribArray(positionAttribute);
+	glEnableVertexAttribArray(vertexAttribute[0]);
 	// the source points are excluded from this vertex data
-	glVertexAttribPointer(positionAttribute, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), (const GLvoid *)((mapReader->getVertexData()[0].size() + 1) * sizeof(Vertex)));
-	
+	glVertexAttribPointer(vertexAttribute[0], 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), (const GLvoid *)((mapReader->getVertexData()[0].size() + 1) * sizeof(Vertex)));
+	glBindVertexArray(0);
+
 	glGenBuffers(1, &vertexBuffer[1]);
-	glGenVertexArrays(1, &vertexArrayObject[2]);
-	glBindVertexArray(vertexArrayObject[2]);
+	glGenVertexArrays(1, &vertexArrayObject[1]);
+	glBindVertexArray(vertexArrayObject[1]);
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer[1]);
 	glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(vec2), &domainData, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2), (const GLvoid *)0);
+	glBindVertexArray(0); 
 }
 
-
-
-void loadBufferData(const Vertex* dataArray)
+void enableUserFramebuffer()
 {
-	
-	dataArraySSbo = init->AllocateBuffer(GL_SHADER_STORAGE_BUFFER, (float*)dataArray, (mapReader->getSizeOfDataArray()) * sizeof(Vertex));
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, dataArraySSbo);
+	glGenFramebuffers(1, &framebufferObject[0]);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebufferObject[0]);
 
-	glGenVertexArrays(1, &vertexArrayObject[1]);
-	glBindVertexArray(vertexArrayObject[1]);
-	
-	glBindBuffer(GL_ARRAY_BUFFER, dataArraySSbo);
+/*	glGenTextures(1, &prevRender[0]);
+	glBindTexture(GL_TEXTURE_2D, prevRender[0]);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, windowWidth, windowHeight);
 
-	glEnableVertexAttribArray(0);
-	// the source points are excluded from this vertex data
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), (const GLvoid *)((mapReader->getVertexData()[0].size()+1) * sizeof(Vertex)));
-	glBindVertexArray(0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)*/;
+	
+	glGenTextures(1, &prevRender[0]);
+	glBindTexture(GL_TEXTURE_2D, prevRender[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, prevRender[0], 0);
+
+
+	//glGenTextures(1, &prevRender[1]);
+	//glBindTexture(GL_TEXTURE_2D, prevRender[1]);
+	//glTexStorage2D(GL_TEXTURE_2D, 1, GL_STENCIL_INDEX8, windowWidth, windowHeight);
+
+	// attach the textures to the framebuffer
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, prevRender[0], 0);
+	//glFramebufferTexture(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, prevRender[1], 0);
+
+	switch (glCheckFramebufferStatus(GL_FRAMEBUFFER))
+	{
+	case GL_FRAMEBUFFER_COMPLETE:
+		cout << "Framebuffer succesfully binded" << endl;
+		break;
+	case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+		cout << "ERROR::FRAMEBUFFER::GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT" << endl;
+		break;
+	case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+		cout << "ERROR::FRAMEBUFFER::GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT " << endl;
+		break;
+	case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
+		cout << "ERROR::FRAMEBUFFER::GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER " << endl;
+		break;
+	case GL_FRAMEBUFFER_UNSUPPORTED:
+		cout << "ERROR::FRAMEBUFFER::GL_FRAMEBUFFER_UNSUPPORTED " << endl;
+		break;
+	default:
+		cerr << "ERROR::FRAMEBUFFER:: Framebuffer did not bind" << endl;
+		break;
+	}
+	// make sure we clear the framebuffer's content
+	glClearColor(0.f, 0.f, 1.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	/*static const GLenum draw_buffers[] = { GL_COLOR_ATTACHMENT0 };
+	glDrawBuffers(1, draw_buffers);*/
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 
@@ -573,7 +618,7 @@ int main(int argc, char* argv[])
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
-	glutReshapeWindow(WINDOW_WIDTH, WINDOW_HEIGHT);
+	glutReshapeWindow(windowWidth, windowHeight);
 	// glutIdleFunc(runSPM);
 	// initializes OpenGL like init()
 	Angel::InitOpenGL();
@@ -581,14 +626,15 @@ int main(int argc, char* argv[])
 	mapReader->printDataArray(mapReader->getDataArray());
 	mapReader->printIndices();
 	loadDefaultShader();
-	loadShadowAreaShader();
+	loadDrawSPMShader();
 	loadSearchComputeShader();
+	loadShadowAreaShader();
 	loadDistanceComputeShader();
-	InitSPMSystem();
-	/*
 	loadConeShader();
-	*/
-	loadDefaultBufferData();
+	
+	InitSPMSystem();
+	loadBufferData();
+	enableUserFramebuffer();
 	Angel::CheckError();
 
 	// enters the GLUT event processing loop

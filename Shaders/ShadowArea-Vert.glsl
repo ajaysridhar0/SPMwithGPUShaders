@@ -1,7 +1,7 @@
 //ShadowArea-VertexShader.glsl
 #version 420
 
-in layout (location = 0)  vec4 vertex;
+in vec4 vertex;
 // TODO: add this to attribute variables in SPMwithGPUShader.cpp
 
 

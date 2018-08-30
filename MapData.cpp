@@ -47,7 +47,7 @@ void MapData::readSettings()
 	if (file.is_open())
 	{
 		file >> checkNumPolygons >> numOfPolygons >>
-			checkDomain >> domainWidth >> domainHeight;
+			checkDomain >> domain;
 		
 		//numOfPolygons++;
 	}
@@ -106,10 +106,10 @@ void MapData::addSourcePoint(vec2 sourcePoint)
 void MapData::printData()
 {
 	cout << "-----DOMAIN-----" << endl;
-	cout << "Bottomleft: " << "(" << -domainWidth << ", " <<
-		-domainHeight << ") " << endl;
-	cout << "Topright: " << "(" << domainWidth << ", " <<
-		domainHeight << ") " << endl;
+	cout << "Bottomleft: " << "(" << -domain << ", " <<
+		-domain << ") " << endl;
+	cout << "Topright: " << "(" << domain << ", " <<
+		domain << ") " << endl;
 	cout << "----------------" << endl;
 	cout << endl;
 	cout << "-----SOURCES-----" << endl;
@@ -185,7 +185,7 @@ void MapData::setDataArray()
 			// distance is practically infinite for obstacle vertices
 			// status < 0 for obstacle vertex
 			// parent index = -1 b/c its undefined
-			dataArray[index] = { vertexData[i][j].x / domainWidth, vertexData[i][j].y / domainHeight, numeric_limits<float>::max(), -1., -1., float(index)};
+			dataArray[index] = { vertexData[i][j].x / domain, vertexData[i][j].y / domain, numeric_limits<float>::max(), -1., -1., float(index)};
 			index++;
 		}
 	}
@@ -224,12 +224,12 @@ GLuint ** MapData::getIndices()
 
 vec2 MapData::getInitDomain()
 {
-	return vec2(domainWidth, domainHeight);
+	return vec2(domain, domain);
 }
 
 int MapData::getSizeOfDataArray()
 {
-	return numOfVertices++;
+	return numOfVertices+1;
 }
 
 int MapData::getNumOfPolygons()

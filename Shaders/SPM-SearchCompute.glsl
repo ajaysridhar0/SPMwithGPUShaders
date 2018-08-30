@@ -23,7 +23,6 @@ buffer_DataArray
 	Vertex DataArray[];
 };
 
-
 void main(void)
 {
 	int generatorID = -1;
@@ -42,7 +41,7 @@ void main(void)
 			}	
 		}
 	}
-	DataArray[0] = DataArray[0];
+	DataArray[0] = DataArray[generatorID];
 	DataArray[generatorID].status = 0.; // EXPANDED
 }
 

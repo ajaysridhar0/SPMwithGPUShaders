@@ -24,16 +24,48 @@ buffer_DataArray
 	Vertex DataArray[];
 };
 
+layout (std430, binding = 1) buffer
+buffer_StencilValues
+{
+	uint StencilValues[];
+};
 
 uniform uint windowSize[2];
 
-uniform uint stencilValues[10];
-
 const uint pixelIndex(vec2 mapCoord)
 {
-	uint x = int(((windowSize[0] -1)/ 2) * (mapCoord.x + 1));
-	uint y =	int(((windowSize[1] -1) / 2) * (mapCoord.y + 1));
-	return y * windowSize[0] + x;
+	uint x = int(((1024 -1)/ 2) * (mapCoord.x + 1));
+	uint y =	int(((1024 -1) / 2) * (mapCoord.y + 1));
+	return y * 1024 + x;
+}
+
+bool inShadow(vec2 mapCoord)
+{
+	int shadowCounter = 0;
+	int miniShadowCounter = 0;
+	for (int i = 0; i <= 4; i++)
+	{
+		for (int j = 0; j <= 4; j ++)
+		{
+			if (StencilValues[pixelIndex(mapCoord) + (2 - i)*1024 + j - 2] == 1)
+			{
+				shadowCounter++;
+				if (i >= 1 && i <= 3 && j >= 1 && j <=3)
+				{
+					miniShadowCounter++;
+				}
+			}
+		}
+	}
+	if (shadowCounter == 25)
+	{
+		return false;
+	}
+	if (miniShadowCounter == 9)
+	{
+		return false;
+	}
+	return true;
 }
 
 void main()
@@ -43,8 +75,8 @@ void main()
 	             gl_WorkGroupID.x +
 	             gl_LocalInvocationIndex);
 	//const uint index = );
-	bool inShadow = (stencilValues[pixelIndex(vec2(DataArray[id].x, DataArray[id].y))] == 1);
-	if(!inShadow)
+	
+	if(inShadow(vec2(DataArray[id].x, DataArray[id].y)))
 	{
 		vec2 p = normalize(vec2(DataArray[id].x, DataArray[id].y));
 		vec2 pg = normalize(vec2(DataArray[0].x, DataArray[0].y));

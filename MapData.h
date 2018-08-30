@@ -43,7 +43,7 @@ public:
 	int getNumOfPolygons();
 
 private:
-	float domainWidth, domainHeight;
+	float domain;
 	string filename;
 	string line;
 	int numOfPolygons;
