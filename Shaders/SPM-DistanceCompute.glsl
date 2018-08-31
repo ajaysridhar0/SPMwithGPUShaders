@@ -30,7 +30,7 @@ buffer_StencilValues
 	uint StencilValues[];
 };
 
-uniform uint windowSize[2];
+Vertex gCurr = DataArray[0];
 
 const uint pixelIndex(vec2 mapCoord)
 {
@@ -59,13 +59,13 @@ bool inShadow(vec2 mapCoord)
 	}
 	if (shadowCounter == 25)
 	{
-		return false;
+		return true;
 	}
 	if (miniShadowCounter == 9)
 	{
 		return false;
 	}
-	return true;
+	return false;
 }
 
 void main()
@@ -75,17 +75,20 @@ void main()
 	             gl_WorkGroupID.x +
 	             gl_LocalInvocationIndex);
 	//const uint index = );
-	
-	if(inShadow(vec2(DataArray[id].x, DataArray[id].y)))
+	for ( id = 1; id < DataArray.length(); id++)
 	{
-		vec2 p = normalize(vec2(DataArray[id].x, DataArray[id].y));
-		vec2 pg = normalize(vec2(DataArray[0].x, DataArray[0].y));
-		float newDist = distance(p, pg) + DataArray[0].distance;
-
-		if(DataArray[id].distance < newDist)
+		if (!inShadow(vec2(DataArray[id].x, DataArray[id].y)))
 		{
-			DataArray[id].distance = newDist;
-			DataArray[id].parentID = DataArray[0].ID;
+			vec2 p = vec2(DataArray[id].x, DataArray[id].y);
+			vec2 pg = vec2(gCurr.x, gCurr.y);
+			
+			float newDist = distance(p, pg) + gCurr.distance;
+	
+			if ((DataArray[id].distance > 1000 || newDist < DataArray[id].distance))
+			{
+				DataArray[id].distance = newDist;
+				DataArray[id].parentID = DataArray[0].ID;
+			}
 		}
 	}
 }

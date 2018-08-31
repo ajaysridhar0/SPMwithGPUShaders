@@ -160,7 +160,7 @@ void MapData::printIndices()
 
 void MapData::printDataArray(Vertex * dataArray)
 {
-	for (int i = 0; i < numOfVertices; i++)
+	for (int i = 0; i < numOfVertices+1; i++)
 	{
 		cout << "dataArray[" << i << "]: " << "(" << dataArray[i].x 
 			<< ", " << dataArray[i].y << ")" << ", dist = " << dataArray[i].distance << ", status = " 
@@ -185,7 +185,9 @@ void MapData::setDataArray()
 			// distance is practically infinite for obstacle vertices
 			// status < 0 for obstacle vertex
 			// parent index = -1 b/c its undefined
-			dataArray[index] = { vertexData[i][j].x / domain, vertexData[i][j].y / domain, numeric_limits<float>::max(), -1., -1., float(index)};
+			//dataArray[index] = { vertexData[i][j].x / domain, vertexData[i][j].y / domain, numeric_limits<float>::max(), -1., -1., float(index)};
+			dataArray[index] = { vertexData[i][j].x / domain, vertexData[i][j].y / domain, 1024, -1., -1., float(index)};
+			
 			index++;
 		}
 	}

@@ -2,6 +2,7 @@
 //Default fragment shader
 
 out vec4 fFragColor;
+in vec2 vTexCoord;
 
 uniform sampler2D prevRender; // texture with the previous render pass
 
@@ -10,8 +11,7 @@ uniform sampler2D prevRender; // texture with the previous render pass
 
 void main()
 {
-	ivec2 screenpos = ivec2(gl_FragCoord.xy); // convert fragment position to integers
-	vec4 currentValue = texelFetch(prevRender, screenpos, 0); // what is currently stored in this pixel
-	fFragColor = vec4(currentValue.xy, 0., currentValue.w);
-	//fFragColor = vec4(1., 1., 1., 1.);
+	vec4 currentValue = texture(prevRender, vTexCoord); // what is currently stored in this pixel
+	fFragColor = vec4(currentValue.rgb, currentValue.a);
+	//fFragColor = vec4(1., 1., 0., 1.);
 }

@@ -25,6 +25,7 @@ buffer_DataArray
 
 void main(void)
 {
+	//float stop = 3.402823e+39;
 	int generatorID = -1;
 	float generatorDist = -1;
 	uint ntotal = DataArray.length();
@@ -33,8 +34,8 @@ void main(void)
 	{
 		if(DataArray[i].status != 0.)
 		{
-			if(DataArray[i].status > 0. ||
-			(generatorID == -1 || DataArray[i].distance < generatorDist))
+			if( DataArray[i].status > 0. ||
+			(generatorID == -1 ||  DataArray[i].distance < generatorDist))
 			{
 				generatorID = i;
 				generatorDist = DataArray[i].distance;
