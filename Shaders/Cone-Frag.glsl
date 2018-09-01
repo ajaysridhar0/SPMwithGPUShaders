@@ -65,6 +65,7 @@ void main()
 	vec4 currentValue = texture(prevRender, vTexCoord); // what is currently stored in this pixel
 	// if nothing else, pass the current value on
 	fFragColor = currentValue;
+
 	//fFragColor = vec4(0., 1., 1., 1.);
 	if (!inShadow(screenpos))
 	{
@@ -77,9 +78,9 @@ void main()
 		// this gives us the length of a canidate for shortest path
 		float newDist = (distance(p, pg) + gCurr.distance)/distFactor;
 		//fFragColor = vec4(gCurr.x, gCurr.y, newDist / distFactor, 1.);
-		if ((currentValue.a == 0. || newDist < (currentValue.z)))
+		if (currentValue.a == 0. || newDist < currentValue.z)
 		{
-			fFragColor = vec4(gCurr.x, gCurr.y, newDist, 1.);
+			fFragColor = vec4(.5 * (gCurr.x + 1.), .5 * (gCurr.y + 1.), newDist, 1.);
 				// x used for red comp
 				// y used for green comp
 				// length of shortest path for blue comp

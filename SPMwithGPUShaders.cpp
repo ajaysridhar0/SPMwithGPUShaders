@@ -9,6 +9,7 @@ Purpose: Generates a shortest path map
 #include "stdafx.h"
 #include <iostream>
 #include <string>
+#include <vector>
 #include "Angel\Angel.h"
 #include "GL/glew.h"
 #include "GL/freeglut.h"
@@ -19,7 +20,9 @@ using namespace std;
 using namespace Angel;
 
 InitializeShader *init = new InitializeShader();
-MapData* mapReader = new MapData("spiral");
+MapData* mapReader = new MapData("simple2");
+vector<vec2> * pathData = new vector<vec2>();
+GLuint * pathIndices;
 
 vec2 domainData[8] =
 {
@@ -63,8 +66,8 @@ texCoordAttribute[2];
 GLuint framebufferObject[2];
 //prev render
 GLuint prevRender[2];
-// 2 VAO for each shader process
-GLuint vertexArrayObject[2];
+// 3 VAO for each shader process
+GLuint vertexArrayObject[3];
 // compute shaders stuff
 int fullShadowCounter = 0;
 int miniFullShadowCounter = 0;
@@ -73,6 +76,7 @@ float csvf = 4.;
 // forward declaration
 int pixelIndex(vec2 mapCoord);
 void printStencilAdj(vec2 mapCoord);
+void generatePath(int x, int y);
 void globalState(); // done
 void searchCompute(); // needs to be integrated
 void generateMap(); // done
@@ -85,6 +89,7 @@ void runSPM();
 void display();
 void reshape(int W, int H);
 void keyboard(unsigned char key, int x, int y);
+void mouse(int button, int state, int x, int y);
 // default shader 
 void loadDefaultShader();
 // compute shader 
@@ -138,6 +143,56 @@ void printStencilAdj(vec2 mapCoord)
 	cout << endl;
 }
 
+void generatePath(int x, int y)
+{
+	int xPos = x;
+	int yPos = y;
+	GLubyte * colorData = (GLubyte*)malloc(3* sizeof(GLubyte));
+	float prevX=-3, prevY=-3.;
+	int index = 0;
+	while ((colorData[0] != prevX && colorData[1] != prevY) && index < 10)
+	{
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glReadPixels(xPos, windowWidth-yPos, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, colorData);
+		pathData->push_back(vec2(colorData[0], colorData[1]));
+		cout << "pathdata: " << pathData->at(index) << endl;
+		/*if (pathData->size() >= 1)
+		{
+			prevX = pathData->at(index-1).x;
+			prevY = pathData->at(index - 1).y;
+		}*/
+		xPos = int(512 * (colorData[0] +1));
+		yPos = int(512 * (colorData[1] + 1));
+		index++;
+	}
+	//vec2 * pathBufferData = new vec2[pathData->size()];
+	pathIndices = new GLuint[pathData->size()];
+	for (int i = 0; i < pathData->size(); i++)
+	{
+		//pathBufferData[i] = pathData->at(i);
+		pathIndices[i] = GLuint(i);
+	}
+	glGenVertexArrays(1, &vertexArrayObject[2]);
+	glBindVertexArray(vertexArrayObject[2]);
+	GLuint pathBuffer;
+	glGenBuffers(1, &pathBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, pathBuffer);
+	glBufferData(GL_ARRAY_BUFFER, pathData->size() * sizeof(vec2), pathData, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(vertexAttribute[0]);
+	glVertexAttribPointer(vertexAttribute[0], 2, GL_FLOAT, GL_TRUE, sizeof(vec2), (const GLvoid *)(0));
+	glBindVertexArray(0);
+
+	glUseProgram(defaultShaderProgram);
+	glBindVertexArray(vertexArrayObject[2]);
+	glUniformMatrix4fv(projectionUniform[0], 1, GL_TRUE, projection);
+	glUniformMatrix4fv(modelViewUniform[0], 1, GL_TRUE, modelView);
+	glUniform3fv(colorUniform, 1, vec3(1., 1., 1.));
+	glDrawElements(GL_LINE_LOOP, pathData->size(), GL_UNSIGNED_INT, pathIndices);
+	glUseProgram(0);
+	
+}
+
 void globalState()
 {
 	// configure global opengl state
@@ -163,11 +218,12 @@ void generateMap()
 	for (int i = 0; i < mapReader->getNumOfPolygons(); i++)
 	{
 		// warning: works only for concave polygons
-		glDrawElements(GL_LINE_LOOP, mapReader->getVertexData()[i + 1].size(), GL_UNSIGNED_INT, mapReader->getIndices()[i]);
+		glDrawElements(GL_TRIANGLE_FAN, mapReader->getVertexData()[i + 1].size(), GL_UNSIGNED_INT, mapReader->getIndices()[i]);
 
 	}
 	glBindVertexArray(0);
 	glUseProgram(0);
+	
 }
 
 void searchCompute()
@@ -218,7 +274,7 @@ void generateShadowAreas()
 	stencilValuesSSbo = init->AllocateBuffer(GL_SHADER_STORAGE_BUFFER, (unsigned int*)stencilData, windowHeight*windowWidth * sizeof(unsigned int));
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, stencilValuesSSbo);
 	// print stencil values near vertices
-	/*for (int i = mapReader->getVertexData()[0].size() + 1; i < mapReader->getSizeOfDataArray()+1; i++ )
+	for (int i = mapReader->getVertexData()[0].size() + 1; i < mapReader->getSizeOfDataArray(); i++ )
 	{
 		cout << "Vertex: " << mapReader->getDataArray()[i].x << "," << mapReader->getDataArray()[i].y << ":" << endl;
 		printStencilAdj(vec2(mapReader->getDataArray()[i].x, mapReader->getDataArray()[i].y));
@@ -232,7 +288,7 @@ void generateShadowAreas()
 	for (int i = 0; i < 25; i++)
 	{
 		cout << endl;
-	}*/
+	}
 	cout << "iteration: " << counter << endl;
 	counter++;
 	//-------------------------------------------------------------------------------------------------------
@@ -262,8 +318,8 @@ void generateCones()
 void distanceCompute()
 {
 	glUseProgram(distanceComputeShader);
-	//glDispatchCompute(mapReader->getSizeOfDataArray(), 1, 1);
-	glDispatchCompute(1, 1, 1);
+	glDispatchCompute(mapReader->getSizeOfDataArray(), 1, 1);
+	//glDispatchCompute(1, 1, 1);
 	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
 	glUseProgram(0);
 }
@@ -291,7 +347,7 @@ void drawSPM()
 
 void runSPM()
 {
-	for (int i = 0; i < mapReader->getSizeOfDataArray() - 1; i++)
+	for (int i = 0; i < mapReader->getSizeOfDataArray(); i++)
 	{
 		searchCompute();
 		generateShadowAreas();
@@ -310,6 +366,7 @@ void display()
 	}
 	drawSPM();
 	generateMap();
+	//generatePath(500, 500);
 	glutSwapBuffers();
 	Angel::CheckError();
 }
@@ -336,6 +393,27 @@ void keyboard(unsigned char key, int x, int y)
 	default:
 		break;
 	}
+}
+
+void mouse(int button, int state, int x, int y)
+{
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		generatePath(x, y);
+	}
+	else if (button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
+		cout << "DWIGHT" << endl;
+		glutPostRedisplay();
+	}
+	//switch (button)
+	//{
+	///*case GLUT_LEFT_BUTTON:
+	//	if (state == GLUT_DOWN)
+	//	{
+	//		generatePath(x, y);
+	//		glutPostRedisplay();
+	//	}
+	//	break;
+	//}*/
 }
 
 void loadDefaultShader()
@@ -468,7 +546,7 @@ void InitSPMSystem()
 	Vertex* dataArray = new Vertex[mapReader->getSizeOfDataArray()];
 	Vertex* pDataArray = dataArray;
 	pDataArray = mapReader->getDataArray();
-	mapReader->printDataArray(pDataArray);
+	//mapReader->printDataArray(pDataArray);
 	dataArraySSbo = init->AllocateBuffer(GL_SHADER_STORAGE_BUFFER, (float*)pDataArray, (mapReader->getSizeOfDataArray()) * sizeof(Vertex));
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, dataArraySSbo);
 	delete[] dataArray;
@@ -551,7 +629,8 @@ void enableUserFramebuffer()
 	// make sure we clear the framebuffer's content
 	//glBindFramebuffer(GL_FRAMEBUFFER, framebufferObject[0]);
 	glViewport(0, 0, windowWidth, windowHeight);
-	glClearColor(0.0, 0.0, 1.0, 0.);
+	glClearColor(0.0, 0.0, 0.0, 0.);
+	glClearDepth(-1.);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	/*static const GLenum draw_buffers[] = { GL_COLOR_ATTACHMENT0 };
 	glDrawBuffers(1, draw_buffers);*/
@@ -577,20 +656,21 @@ int main(int argc, char* argv[])
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
+	glutMouseFunc(mouse);
 	glutReshapeWindow(windowWidth, windowHeight);
 	// glutIdleFunc(runSPM);
 	// initializes OpenGL like init()
 	Angel::InitOpenGL();
-	mapReader->printData();
-	mapReader->printDataArray(mapReader->getDataArray());
-	mapReader->printIndices();
+	//mapReader->printData();
+	//mapReader->printDataArray(mapReader->getDataArray());
+	//mapReader->printIndices();
 	loadDefaultShader();
 	loadDrawSPMShader();
 	loadSearchComputeShader();
 	loadShadowAreaShader();
 	loadDistanceComputeShader();
 	loadConeShader();
-
+	
 	InitSPMSystem();
 	loadBufferData();
 	enableUserFramebuffer();
@@ -600,4 +680,5 @@ int main(int argc, char* argv[])
 	glutMainLoop();
 	delete mapReader;
 	delete init;
+	delete[] pathIndices;
 }

@@ -24,7 +24,7 @@ buffer_DataArray
 	Vertex DataArray[];
 };
 
-layout (std430, binding = 1) buffer
+layout(std430, binding = 1) buffer
 buffer_StencilValues
 {
 	uint StencilValues[];
@@ -34,8 +34,8 @@ Vertex gCurr = DataArray[0];
 
 const uint pixelIndex(vec2 mapCoord)
 {
-	uint x = int(((1024 -1)/ 2) * (mapCoord.x + 1));
-	uint y =	int(((1024 -1) / 2) * (mapCoord.y + 1));
+	uint x = int(((1023)/ 2) * (mapCoord.x + 1));
+	uint y =	int(((1023) / 2) * (mapCoord.y + 1));
 	return y * 1024 + x;
 }
 
@@ -55,9 +55,13 @@ bool inShadow(vec2 mapCoord)
 					miniShadowCounter++;
 				}
 			}
+			else if (i == 2 && j == 2)
+			{
+				return false;
+			}
 		}
 	}
-	if (shadowCounter == 25)
+	if (shadowCounter >= 25)
 	{
 		return true;
 	}
@@ -74,21 +78,22 @@ void main()
 	             gl_WorkGroupID.y * gl_WorkGroupSize.x +
 	             gl_WorkGroupID.x +
 	             gl_LocalInvocationIndex);
+	//id = int(gl_LocalInvocationIndex);
 	//const uint index = );
-	for ( id = 1; id < DataArray.length(); id++)
-	{
-		if (!inShadow(vec2(DataArray[id].x, DataArray[id].y)))
+	//for ( id = 1; id < DataArray.length(); id++)
+	//{
+		if ( !inShadow(vec2(DataArray[id].x, DataArray[id].y)))
 		{
 			vec2 p = vec2(DataArray[id].x, DataArray[id].y);
 			vec2 pg = vec2(gCurr.x, gCurr.y);
 			
 			float newDist = distance(p, pg) + gCurr.distance;
 	
-			if ((DataArray[id].distance > 1000 || newDist < DataArray[id].distance))
+			if (DataArray[id].distance == 1024. || newDist < DataArray[id].distance)
 			{
 				DataArray[id].distance = newDist;
 				DataArray[id].parentID = DataArray[0].ID;
 			}
 		}
-	}
+	//}
 }

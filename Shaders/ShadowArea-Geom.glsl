@@ -36,7 +36,7 @@ buffer_DataArray
 
 void ProduceVertex(vec4 v)
 {
-	gl_Position = modelView * projection * vec4(v.xy, 0., 1.);
+	gl_Position = modelView * projection * vec4(v.xyz, 1.);
 	EmitVertex();
 }
 

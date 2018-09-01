@@ -1,2 +1,14 @@
-﻿  SPMwithGPUShaders.vcxproj -> C:\PROJECT\ASE final project\SPMwithGPUShaders\Debug\SPMwithGPUShaders.exe
+﻿  SPMwithGPUShaders.cpp
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\angel.h(83): warning C4305: 'initializing': truncation from 'double' to 'GLfloat'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(707): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(708): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(709): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(730): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(732): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(735): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\angel\mat.h(753): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(171): warning C4018: '<': signed/unsigned mismatch
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(386): warning C4305: '-=': truncation from 'double' to 'float'
+c:\project\ase final project\spmwithgpushaders\spmwithgpushaders\spmwithgpushaders.cpp(390): warning C4305: '+=': truncation from 'double' to 'float'
+  SPMwithGPUShaders.vcxproj -> C:\PROJECT\ASE final project\SPMwithGPUShaders\Debug\SPMwithGPUShaders.exe
   SPMwithGPUShaders.vcxproj -> C:\PROJECT\ASE final project\SPMwithGPUShaders\Debug\SPMwithGPUShaders.pdb (Full PDB)

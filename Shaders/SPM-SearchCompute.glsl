@@ -34,12 +34,11 @@ void main(void)
 	{
 		if(DataArray[i].status != 0.)
 		{
-			if( DataArray[i].status > 0. ||
-			(generatorID == -1 ||  DataArray[i].distance < generatorDist))
+			if ((DataArray[i].status > 0.)||(generatorID == -1 ||  DataArray[i].distance < generatorDist))
 			{
 				generatorID = i;
 				generatorDist = DataArray[i].distance;
-			}	
+			}
 		}
 	}
 	DataArray[0] = DataArray[generatorID];
