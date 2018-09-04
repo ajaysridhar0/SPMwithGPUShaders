@@ -1,6 +1,5 @@
 #version 330 compatibility
 
-
 layout (location = 0) in vec2 vertex; 
 layout (location = 1) in vec2 texCoord; 
 uniform mat4 projection, modelView;
